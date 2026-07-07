@@ -25,9 +25,9 @@ class ReconciliationRecord:
     actual_fare: float
     fare_adjustment: float
     detour_ratio: float
-    alert_level: str  # OK, WARNING, CRITICAL
+    alert_level: str
     alert_reason: str
-    status: str  # RECONCILED, PENDING, DISPUTED
+    status: str
     notes: str = ""
     reconciled_at: Optional[datetime] = None
     reconciled_by: str = "SYSTEM"
@@ -35,10 +35,10 @@ class ReconciliationRecord:
 class DetourAnalyzer:
     """Analiza desvios en rutas y genera alertas"""
     
-    DETOUR_WARNING_THRESHOLD = 1.15  # 15% de desvio
-    DETOUR_CRITICAL_THRESHOLD = 1.30  # 30% de desvio
-    DISTANCE_VARIANCE_WARNING = 0.10  # 10% diferencia
-    DISTANCE_VARIANCE_CRITICAL = 0.20  # 20% diferencia
+    DETOUR_WARNING_THRESHOLD = 1.15
+    DETOUR_CRITICAL_THRESHOLD = 1.30
+    DISTANCE_VARIANCE_WARNING = 0.10
+    DISTANCE_VARIANCE_CRITICAL = 0.20
     
     def analyze_detour(self, estimated_km: float, gps_km: float, detour_ratio: float) -> Tuple[str, str]:
         """Analiza desvio y retorna (nivel_alerta, razon)"""
@@ -48,7 +48,6 @@ class DetourAnalyzer:
         
         variance_pct = abs(gps_km - estimated_km) / estimated_km
         
-        # Criterios de alerta
         if detour_ratio > self.DETOUR_CRITICAL_THRESHOLD or variance_pct > self.DISTANCE_VARIANCE_CRITICAL:
             reason = f"Desvio CRITICO: ratio={detour_ratio:.2f}, varianza={variance_pct*100:.1f}%"
             return "CRITICAL", reason
@@ -60,7 +59,7 @@ class DetourAnalyzer:
         return "OK", "Desvio dentro de parametros normales"
     
     def detect_route_irregularities(self, gps_points: List[Dict]) -> List[Dict]:
-        """Detecta irregularidades en la ruta (paradas raras, velocidades anomalas, etc.)"""
+        """Detecta irregularidades en la ruta"""
         irregularities = []
         
         if len(gps_points) < 3:
@@ -71,13 +70,11 @@ class DetourAnalyzer:
             current_point = gps_points[i]
             next_point = gps_points[i + 1]
             
-            # Velocidad anomala (muy baja para distancia cubierta)
-            time_diff = (current_point['timestamp'] - prev_point['timestamp']).total_seconds() / 3600  # horas
+            time_diff = (current_point['timestamp'] - prev_point['timestamp']).total_seconds() / 3600
             if time_diff > 0:
                 implied_speed = current_point.get('speed', 0)
                 
-                # Parada prolongada (velocidad ~0 por mas de 5 min)
-                if implied_speed < 1 and time_diff > 0.083:  # 5 minutos
+                if implied_speed < 1 and time_diff > 0.083:
                     irregularities.append({
                         'type': 'parada_prolongada',
                         'timestamp': current_point['timestamp'],
@@ -102,19 +99,15 @@ class ReconciliationEngine:
         estimated_distance_km = service_data['estimated_distance_km']
         estimated_fare = service_data['estimated_fare']
         
-        # Calcular varianza de distancia
         distance_variance_km = gps_distance_km - estimated_distance_km
         distance_variance_pct = distance_variance_km / estimated_distance_km if estimated_distance_km > 0 else 0
         
-        # Calcular ajuste de tarifa
         fare_adjustment = actual_fare - estimated_fare
         
-        # Analizar desvio
         alert_level, alert_reason = self.detour_analyzer.analyze_detour(
             estimated_distance_km, gps_distance_km, detour_ratio
         )
         
-        # Crear registro de conciliacion
         record = ReconciliationRecord(
             service_id=service_data['id'],
             vehicle_id=service_data['assigned_vehicle_id'],
@@ -227,7 +220,6 @@ class ReconciliationEngine:
         
         df = pd.DataFrame([r.__dict__ for r in records])
         
-        # Agregar columnas derivadas
         df['alert_priority'] = df['alert_level'].apply(
             lambda x: 3 if x == 'CRITICAL' else (2 if x == 'WARNING' else 1)
         )

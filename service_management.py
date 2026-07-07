@@ -26,14 +26,14 @@ class AssignmentType(str, Enum):
     """Tipos de asignacion de servicios"""
     MANUAL = "MANUAL"
     AUTOMATICO = "AUTOMATICO"
-    OFERTA = "OFERTA"  # Conductores hacen oferta
+    OFERTA = "OFERTA"
 
 @dataclass
 class ServiceRequest:
     """Solicitud de servicio"""
     id: str
     client_id: str
-    service_type: str  # '6001' (Traslado), 'Mecanica', etc.
+    service_type: str
     origin_lat: float
     origin_lon: float
     destination_lat: float
@@ -42,11 +42,11 @@ class ServiceRequest:
     destination_address: str = ""
     passenger_count: int = 1
     luggage_count: int = 0
-    special_requirements: str = ""  # discapacitados, mascotas, etc.
+    special_requirements: str = ""
     estimated_distance_km: float = 0.0
     estimated_duration_min: int = 0
     base_fare: float = 0.0
-    surge_multiplier: float = 1.0  # Multiplicador por demanda
+    surge_multiplier: float = 1.0
     total_fare: float = 0.0
     created_at: datetime = field(default_factory=datetime.utcnow)
     status: ServiceStatus = ServiceStatus.PENDIENTE
@@ -108,38 +108,30 @@ class TarificationEngine:
         self.base_rate_per_km = base_rate_per_km
         self.base_fare = base_fare
         self.waiting_rate_per_min = waiting_rate_per_min
-        self.surge_rules = {}  # Reglas dinamicas segun horario/zona
+        self.surge_rules = {}
     
     def calculate_fare(self, request: ServiceRequest) -> float:
         """Calcula tarifa total basado en distancia, demanda y extras"""
-        # Tarifa base
         fare = self.base_fare
         
-        # Tarifa por distancia
         if request.estimated_distance_km > 0:
             fare += request.estimated_distance_km * self.base_rate_per_km
         
-        # Multiplicador por demanda (surge pricing)
         fare *= request.surge_multiplier
-        
-        # Extras
         fare += self._calculate_extras(request)
         
-        return max(fare, self.base_fare)  # Minimo de tarifa base
+        return max(fare, self.base_fare)
     
     def _calculate_extras(self, request: ServiceRequest) -> float:
         """Calcula cargos adicionales por pasajeros, equipaje, etc."""
         extras = 0.0
         
-        # Extra por pasajeros adicionales (mas de 1)
         if request.passenger_count > 1:
             extras += (request.passenger_count - 1) * 0.5
         
-        # Extra por equipaje
         if request.luggage_count > 2:
             extras += (request.luggage_count - 2) * 0.25
         
-        # Extra por requisitos especiales
         if 'discapacitado' in request.special_requirements.lower():
             extras += 2.0
         if 'mascotas' in request.special_requirements.lower():
@@ -152,17 +144,10 @@ class TarificationEngine:
         """Calcula tarifa final basada en valores reales"""
         fare = self.base_fare
         
-        # Tarifa por distancia (usar la mayor entre estimada y real)
         distance_for_calc = max(request.estimated_distance_km, actual_distance_km)
         fare += distance_for_calc * self.base_rate_per_km
-        
-        # Tarifa por espera
         fare += waiting_time_min * self.waiting_rate_per_min
-        
-        # Multiplicador por demanda
         fare *= request.surge_multiplier
-        
-        # Extras
         fare += self._calculate_extras(request)
         
         return max(fare, self.base_fare)
@@ -170,7 +155,7 @@ class TarificationEngine:
     def set_surge_multiplier(self, request_count: int, available_vehicles: int) -> float:
         """Calcula multiplicador dinamico basado en oferta/demanda"""
         if available_vehicles == 0:
-            return 5.0  # Maximo permitido
+            return 5.0
         
         ratio = request_count / available_vehicles
         
@@ -200,7 +185,6 @@ class AssignmentEngine:
             logger.warning(f"[ASSIGN] Sin vehiculos disponibles para servicio {request.id}")
             return None
         
-        # Calcular distancia a cada vehiculo desde origen del servicio
         best_vehicle = None
         min_distance = float('inf')
         
@@ -228,7 +212,7 @@ class AssignmentEngine:
                 'timestamp': datetime.utcnow()
             })
             
-            logger.info(f"[ASSIGN] Servicio {request.id} asignado a {vehicle_id} (distancia: {min_distance:.2f} km)")
+            logger.info(f"[ASSIGN] Servicio {request.id} asignado a {vehicle_id} ({min_distance:.2f} km)")
             return vehicle_id
         
         return None
@@ -275,7 +259,7 @@ class AssignmentEngine:
             dlon = lon2 - lon1
             a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
             c = 2 * asin(sqrt(a))
-            r = 6371  # Radio de la Tierra en km
+            r = 6371
             return c * r
         except:
             return float('inf')
@@ -285,7 +269,7 @@ class ServiceWorkflow:
     
     def __init__(self):
         self.services: Dict[str, ServiceRequest] = {}
-        self.gps_tracking: Dict[str, List[Dict]] = {}  # Tracking GPS por servicio
+        self.gps_tracking: Dict[str, List[Dict]] = {}
     
     def create_service(self, request: ServiceRequest) -> Tuple[bool, str]:
         """Crea nuevo servicio si es valido"""
@@ -311,7 +295,6 @@ class ServiceWorkflow:
         service = self.services[service_id]
         old_status = service.status
         
-        # Validar transiciones validas
         valid_transitions = {
             ServiceStatus.PENDIENTE: [ServiceStatus.ASIGNADO, ServiceStatus.CANCELADO],
             ServiceStatus.ASIGNADO: [ServiceStatus.EN_CAMINO, ServiceStatus.CANCELADO],
@@ -328,7 +311,6 @@ class ServiceWorkflow:
         
         service.status = new_status
         
-        # Registrar eventos importantes
         if new_status == ServiceStatus.EN_CAMINO:
             service.acceptance_time = datetime.utcnow()
         elif new_status == ServiceStatus.EN_ORIGEN:
@@ -367,7 +349,6 @@ class ServiceWorkflow:
         if len(gps_points) < 2:
             return 1.0
         
-        # Calcular distancia real del recorrido GPS
         actual_distance = 0.0
         for i in range(len(gps_points) - 1):
             p1 = gps_points[i]
@@ -385,7 +366,7 @@ class ServiceWorkflow:
         service.actual_distance_km = actual_distance
         service.detour_ratio = detour_ratio
         
-        logger.info(f"[SERVICE] Servicio {service_id} - Distancia real: {actual_distance:.2f} km, Detour ratio: {detour_ratio:.2f}")
+        logger.info(f"[SERVICE] Servicio {service_id} - Distancia real: {actual_distance:.2f} km, Detour: {detour_ratio:.2f}")
         
         return detour_ratio
     

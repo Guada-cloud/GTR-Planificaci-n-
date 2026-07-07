@@ -18,11 +18,11 @@ class ClientBill:
     period_start: datetime
     period_end: datetime
     total_services: int
-    subtotal: float  # Sin IVA
+    subtotal: float
     iva_pct: float
     iva_amount: float
     total_amount: float
-    status: str  # DRAFT, ISSUED, PAID, OVERDUE
+    status: str
     issue_date: datetime
     due_date: datetime
     payment_date: Optional[datetime] = None
@@ -42,10 +42,8 @@ class BillingEngine:
                             payment_terms_days: int = 30) -> ClientBill:
         """Genera factura para cliente por servicios en periodo"""
         
-        # Calcular subtotal
         subtotal = sum(s['actual_fare'] for s in services)
         
-        # Agregar extras
         extras = 0.0
         for service in services:
             if 'extras' in service:
@@ -53,11 +51,9 @@ class BillingEngine:
         
         subtotal += extras
         
-        # Calcular IVA
         iva_amount = subtotal * (self.default_iva_pct / 100.0)
         total_amount = subtotal + iva_amount
         
-        # Crear factura
         bill = ClientBill(
             id=f"BILL-{client_id}-{period_start.strftime('%Y%m%d')}",
             client_id=client_id,
@@ -125,7 +121,6 @@ class BillingEngine:
         
         bill = self.bills[bill_id]
         
-        # Crear DataFrame
         data = {
             'Concepto': ['Subtotal', f'IVA ({bill.iva_pct}%)', 'TOTAL'],
             'Monto': [bill.subtotal, bill.iva_amount, bill.total_amount]
@@ -133,7 +128,6 @@ class BillingEngine:
         
         df = pd.DataFrame(data)
         
-        # Exportar a Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Factura', index=False)
@@ -220,7 +214,6 @@ class ProductivityReporter:
         
         df = pd.DataFrame(filtered)
         
-        # Agrupar por nivel de alerta
         deviation_summary = df.groupby('alert_level').agg({
             'service_id': 'count',
             'detour_ratio': 'mean',
@@ -240,16 +233,9 @@ class ProductivityReporter:
         services_df = pd.DataFrame(services)
         payments_df = pd.DataFrame(payments)
         
-        # Ingresos totales
         total_revenue = services_df['actual_fare'].sum()
-        
-        # Costos (pagos a conductores)
         total_driver_payments = payments_df['driver_amount'].sum()
-        
-        # Comisiones retenidas
         platform_revenue = payments_df['platform_fee'].sum()
-        
-        # Margen
         margin = total_revenue - total_driver_payments
         margin_pct = (margin / total_revenue * 100) if total_revenue > 0 else 0
         

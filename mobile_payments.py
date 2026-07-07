@@ -26,12 +26,12 @@ class DriverPayment:
     driver_id: str
     service_id: str
     service_fare: float
-    driver_commission_pct: float  # % que le corresponde al conductor
-    driver_amount: float  # Monto a pagar al conductor
-    platform_fee: float  # Comision de plataforma
+    driver_commission_pct: float
+    driver_amount: float
+    platform_fee: float
     taxes: float
     status: PaymentStatus = PaymentStatus.PENDIENTE
-    payment_method: str = "BANK_TRANSFER"  # BANK_TRANSFER, WALLET, CASH
+    payment_method: str = "BANK_TRANSFER"
     created_at: datetime = field(default_factory=datetime.utcnow)
     processed_at: Optional[datetime] = None
     reference_number: str = ""
@@ -45,10 +45,10 @@ class DriverLiquidation:
     period_start: datetime
     period_end: datetime
     total_services: int
-    total_earnings: float  # Ingresos totales del conductor
-    total_commission: float  # Comisiones pagadas al conductor
-    total_fees: float  # Comisiones de plataforma retenidas
-    net_payment: float  # Monto neto a pagar
+    total_earnings: float
+    total_commission: float
+    total_fees: float
+    net_payment: float
     status: PaymentStatus = PaymentStatus.PENDIENTE
     payment_date: Optional[datetime] = None
     payment_method: str = "BANK_TRANSFER"
@@ -58,10 +58,6 @@ class DriverPaymentEngine:
     """Motor de gestion de pagos a conductores"""
     
     def __init__(self, platform_commission_pct: float = 25.0):
-        """
-        Args:
-            platform_commission_pct: Porcentaje de comision de plataforma (ej: 25% = conductor recibe 75%)
-        """
         self.platform_commission_pct = platform_commission_pct
         self.driver_commission_pct = 100 - platform_commission_pct
         self.payments: Dict[str, DriverPayment] = {}
@@ -80,7 +76,7 @@ class DriverPaymentEngine:
         """Crea registro de pago para un servicio completado"""
         
         driver_amount, platform_fee = self.calculate_driver_earnings(service_fare)
-        taxes = driver_amount * 0.05  # 5% de impuestos (ajustable)
+        taxes = driver_amount * 0.05
         net_driver_amount = driver_amount - taxes
         
         payment = DriverPayment(
@@ -120,7 +116,6 @@ class DriverPaymentEngine:
                           period_end: datetime) -> Optional[DriverLiquidation]:
         """Crea liquidacion periodica para un conductor"""
         
-        # Filtrar pagos del periodo
         period_payments = [
             p for p in self.payments.values()
             if p.driver_id == driver_id and 
